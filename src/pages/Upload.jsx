@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Image } from "@/components/ui/image";
@@ -91,12 +91,20 @@ export default function Upload() {
             <div className="text-sm text-white/60">مرحباً</div>
             <div className="font-display text-xl font-bold">{name || "عميلنا"}</div>
           </div>
-          <button
-            onClick={reset}
-            className="flex items-center gap-1 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/60 hover:bg-white/10"
-          >
-            <RotateCcw className="h-3.5 w-3.5" /> جلسة جديدة
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              to="/my-rewards"
+              className="flex items-center gap-1 rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-400/20"
+            >
+              <Gift className="h-3.5 w-3.5" /> مكافآتي
+            </Link>
+            <button
+              onClick={reset}
+              className="flex items-center gap-1 rounded-full border border-white/10 px-3 py-1.5 text-xs text-white/60 hover:bg-white/10"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> جلسة جديدة
+            </button>
+          </div>
         </div>
 
         <div className="mt-5">

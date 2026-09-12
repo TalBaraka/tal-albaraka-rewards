@@ -10,6 +10,7 @@ import ScrollToTop from './components/ScrollToTop';
 import Home from '@/pages/Home';
 import Upload from '@/pages/Upload';
 import SelectGame from '@/pages/SelectGame';
+import MyRewards from '@/pages/MyRewards';
 import Layout from '@/components/Layout';
 
 const AuthenticatedApp = () => {
@@ -43,6 +44,7 @@ const AuthenticatedApp = () => {
         <Route path="/" element={<Home />} />
         <Route path="/upload" element={<Upload />} />
         <Route path="/select-game" element={<SelectGame />} />
+        <Route path="/my-rewards" element={<MyRewards />} />
       </Route>
       <Route path="*" element={<PageNotFound />} />
     </Routes>

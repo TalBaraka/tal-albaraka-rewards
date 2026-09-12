@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Image } from "@/components/ui/image";
-import { Ticket, Sparkles } from "lucide-react";
+import { Ticket, Sparkles, Gift } from "lucide-react";
 
 const LOGO =
   "https://media.base44.com/images/public/user_6aa5b6794b20a238746064f4/67690d900_file_00000000b9e88211a5be3d9760e16833.png";
@@ -78,8 +78,15 @@ export default function Home() {
 
       <div className="mt-8 flex items-center gap-2 text-xs text-white/50">
         <Ticket className="h-4 w-4 text-amber-300" />
-        4 فواتير معتمدة = لعبة مجانية
+        4 فواتير معتمدة = فتح جميع الألعاب
       </div>
+
+      <Link
+        to="/my-rewards"
+        className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-white/70 hover:bg-white/10"
+      >
+        <Gift className="h-4 w-4 text-amber-300" /> عرض مكافآتي
+      </Link>
     </div>
   );
 }
