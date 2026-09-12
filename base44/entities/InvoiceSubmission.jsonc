@@ -1,0 +1,36 @@
+{
+  "name": "InvoiceSubmission",
+  "type": "object",
+  "properties": {
+    "customer_id": {
+      "type": "string"
+    },
+    "customer_name": {
+      "type": "string"
+    },
+    "invoice_number": {
+      "type": "string"
+    },
+    "image_url": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "approved",
+        "rejected"
+      ],
+      "default": "approved"
+    },
+    "merchant_name": {
+      "type": "string"
+    },
+    "rejection_reason": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "invoice_number",
+    "status"
+  ]
+}

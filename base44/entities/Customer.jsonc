@@ -1,0 +1,22 @@
+{
+  "name": "Customer",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "approved_count": {
+      "type": "integer",
+      "default": 0
+    },
+    "game_selected": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}
