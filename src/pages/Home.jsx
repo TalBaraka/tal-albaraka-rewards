@@ -25,12 +25,23 @@ export default function Home() {
     setLoading(true);
     try {
       const session_id = crypto.randomUUID();
-      const res = await base44.functions.invoke("registerCustomer", { name: trimmed, session_id });
+      // persistent device id: binds the customer's rewards to this device
+      let device_id = localStorage.getItem("tal_device_id");
+      if (!device_id) {
+        device_id = crypto.randomUUID();
+        localStorage.setItem("tal_device_id", device_id);
+      }
+      const res = await base44.functions.invoke("registerCustomer", {
+        name: trimmed,
+        session_id,
+        device_id
+      });
       const data = res?.data || res;
       if (data?.id) {
         localStorage.setItem("tal_customer_id", data.id);
         localStorage.setItem("tal_customer_name", data.name);
         localStorage.setItem("tal_count", String(data.approved_count || 0));
+        localStorage.setItem("tal_state", JSON.stringify(data));
       }
       navigate("/upload");
     } catch (e) {

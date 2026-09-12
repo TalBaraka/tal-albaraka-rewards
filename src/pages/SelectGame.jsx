@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Image } from "@/components/ui/image";
 import { GAMES, GAME_BY_KEY } from "@/lib/games";
 import { CheckCircle2, Loader2, PartyPopper, Home as HomeIcon } from "lucide-react";
+import PrizeBanner from "@/components/PrizeBanner";
 
 export default function SelectGame() {
   const navigate = useNavigate();
@@ -13,18 +14,28 @@ export default function SelectGame() {
   const [selected, setSelected] = useState(null); // game key
   const [confirmed, setConfirmed] = useState(null); // game object
   const [busy, setBusy] = useState(false);
+  const [prize, setPrize] = useState(null);
 
   useEffect(() => {
     const id = localStorage.getItem("tal_customer_id");
     const nm = localStorage.getItem("tal_customer_name");
     const cnt = Number(localStorage.getItem("tal_count") || 0);
+    let st = null;
+    try {
+      st = JSON.parse(localStorage.getItem("tal_state") || "null");
+    } catch (_) { /* ignore */ }
     if (!id) {
       navigate("/");
+      return;
+    }
+    if (st && st.prize_status && st.prize_status !== "available") {
+      navigate("/my-rewards");
       return;
     }
     setCustomerId(id);
     setName(nm || "");
     setCount(cnt);
+    if (st) setPrize(st);
     if (cnt < 4) navigate("/upload");
   }, [navigate]);
 
@@ -40,6 +51,8 @@ export default function SelectGame() {
       const data = res?.data || res;
       if (data?.game_selected) {
         setConfirmed(GAME_BY_KEY(data.game_selected) || GAME_BY_KEY(key));
+        localStorage.setItem("tal_state", JSON.stringify(data));
+        setPrize(data);
       }
     } catch (e) {
       setSelected(null);
@@ -76,6 +89,8 @@ export default function SelectGame() {
             <CheckCircle2 className="h-5 w-5" /> تم تأكيد اختيار اللعبة
           </div>
         </div>
+
+        {prize && <PrizeBanner state={prize} onUpdate={setPrize} />}
 
         <button
           onClick={restart}

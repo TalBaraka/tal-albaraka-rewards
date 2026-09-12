@@ -1,4 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.44';
+import { customerState } from "../../shared/customerState.ts";
 
 const MASTER_REF_1 = "https://media.base44.com/images/public/user_6aa5b6794b20a238746064f4/69092339e_image-1789243802114.jpg";
 const MASTER_REF_2 = "https://media.base44.com/images/public/user_6aa5b6794b20a238746064f4/26a46bef5_1789154356427.jpg";
@@ -106,17 +107,28 @@ export default async function(req: Request): Promise<Response> {
       merchant_name: verdict?.merchant_name || null
     });
 
-    // 5) Increment the customer's approved count.
+    // 5) Increment the customer's approved count + award the prize at 4.
     let newCount = 1;
+    let prize_awarded = false;
     if (customer) {
       newCount = (customer.approved_count || 0) + 1;
-      await sr.entities.Customer.update(customer_id, { approved_count: newCount });
+      const update = { approved_count: newCount };
+      if (newCount >= 4 && (customer.prize_status || "none") === "none") {
+        const now = Date.now();
+        update.prize_status = "available";
+        update.prize_awarded_at = new Date(now).toISOString();
+        update.prize_expires_at = new Date(now + 60 * 60 * 1000).toISOString();
+        prize_awarded = true;
+      }
+      customer = await sr.entities.Customer.update(customer_id, update);
     }
 
     return Response.json({
       approved: true,
       count: newCount,
       invoice_number,
+      prize_awarded,
+      customer: customer ? customerState(customer) : null,
       message: "تم قبول الفاتورة بنجاح"
     });
   } catch (error: any) {

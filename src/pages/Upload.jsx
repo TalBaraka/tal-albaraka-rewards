@@ -4,6 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Image } from "@/components/ui/image";
 import { UploadCloud, CheckCircle2, XCircle, Loader2, Gift, RotateCcw } from "lucide-react";
+import PrizeBanner from "@/components/PrizeBanner";
 
 export default function Upload() {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ export default function Upload() {
   const [status, setStatus] = useState(null); // {type:'success'|'error', message}
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(null);
+  const [prize, setPrize] = useState(null);
 
   useEffect(() => {
     const id = localStorage.getItem("tal_customer_id");
@@ -26,7 +28,10 @@ export default function Upload() {
     setCustomerId(id);
     setName(nm || "");
     setCount(cnt);
-    if (cnt >= 4) navigate("/select-game");
+    try {
+      const st = JSON.parse(localStorage.getItem("tal_state") || "null");
+      if (st) setPrize(st);
+    } catch (_) { /* ignore */ }
   }, [navigate]);
 
   const TARGET = 4;
@@ -56,8 +61,15 @@ export default function Upload() {
         setCount(newCount);
         localStorage.setItem("tal_count", String(newCount));
         setStatus({ type: "success", message: `تم قبول الفاتورة! ${newCount}/4` });
-        if (newCount >= 4) {
-          setTimeout(() => navigate("/select-game"), 900);
+        if (data.customer) {
+          localStorage.setItem("tal_state", JSON.stringify(data.customer));
+          setPrize(data.customer);
+          if (data.prize_awarded) {
+            setStatus({
+              type: "success",
+              message: "تم قبول الفاتورة! 🎉 مبروك، فتحت جميع الألعاب!"
+            });
+          }
         }
       } else {
         setStatus({ type: "error", message: data?.message || "لم يتم قبول الفاتورة." });
@@ -79,6 +91,7 @@ export default function Upload() {
     localStorage.removeItem("tal_customer_id");
     localStorage.removeItem("tal_customer_name");
     localStorage.removeItem("tal_count");
+    localStorage.removeItem("tal_state");
     navigate("/");
   };
 
@@ -182,20 +195,8 @@ export default function Upload() {
         </div>
       )}
 
-      {/* unlock banner */}
-      {complete && (
-        <div className="rounded-3xl border border-amber-400/30 bg-gradient-to-l from-amber-400/15 to-rose-500/15 p-6 text-center backdrop-blur">
-          <Gift className="mx-auto h-10 w-10 text-amber-300" />
-          <div className="mt-3 font-display text-xl font-bold">اكتملت الفواتير! 🎉</div>
-          <p className="mt-1 text-sm text-white/70">يمكنك الآن اختيار لعبتك المجانية</p>
-          <Button
-            onClick={() => navigate("/select-game")}
-            className="mt-4 h-12 w-full bg-gradient-to-l from-amber-400 to-rose-500 text-base font-bold text-black hover:from-amber-300 hover:to-rose-400"
-          >
-            اختر لعبتك المجانية
-          </Button>
-        </div>
-      )}
+      {/* prize banner */}
+      {complete && prize && <PrizeBanner state={prize} onUpdate={setPrize} />}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Image } from "@/components/ui/image";
 import { GAMES } from "@/lib/games";
 import { Lock, CheckCircle2, UploadCloud, Gift } from "lucide-react";
+import PrizeBanner from "@/components/PrizeBanner";
 
 const TARGET = 4;
 
@@ -11,6 +12,7 @@ export default function MyRewards() {
   const navigate = useNavigate();
   const [name, setName] = useState("");
   const [count, setCount] = useState(0);
+  const [prize, setPrize] = useState(null);
 
   useEffect(() => {
     const id = localStorage.getItem("tal_customer_id");
@@ -20,6 +22,10 @@ export default function MyRewards() {
     }
     setName(localStorage.getItem("tal_customer_name") || "");
     setCount(Number(localStorage.getItem("tal_count") || 0));
+    try {
+      const st = JSON.parse(localStorage.getItem("tal_state") || "null");
+      if (st) setPrize(st);
+    } catch (_) { /* ignore */ }
   }, [navigate]);
 
   const complete = count >= TARGET;
@@ -52,6 +58,11 @@ export default function MyRewards() {
             : `تحتاج ${remaining === 1 ? "فاتورة واحدة" : `${remaining} فواتير`} إضافية لفتح جميع الألعاب`}
         </p>
       </div>
+
+      {/* prize banner */}
+      {prize && prize.prize_status !== "none" && (
+        <PrizeBanner state={prize} onUpdate={setPrize} />
+      )}
 
       {/* games grid */}
       <div>
@@ -95,13 +106,15 @@ export default function MyRewards() {
       </div>
 
       {/* CTA */}
-      <Button
-        onClick={() => navigate(complete ? "/select-game" : "/upload")}
-        className="h-12 w-full bg-gradient-to-l from-amber-400 to-rose-500 text-base font-bold text-black hover:from-amber-300 hover:to-rose-400"
-      >
-        {complete ? "اختر لعبتك المجانية" : "ارفع فاتورة"}
-        {!complete && <UploadCloud className="mr-2 h-5 w-5" />}
-      </Button>
+      {!complete && (
+        <Button
+          onClick={() => navigate("/upload")}
+          className="h-12 w-full bg-gradient-to-l from-amber-400 to-rose-500 text-base font-bold text-black hover:from-amber-300 hover:to-rose-400"
+        >
+          ارفع فاتورة
+          <UploadCloud className="mr-2 h-5 w-5" />
+        </Button>
+      )}
     </div>
   );
 }

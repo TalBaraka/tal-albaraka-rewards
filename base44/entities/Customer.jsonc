@@ -8,11 +8,33 @@
     "session_id": {
       "type": "string"
     },
+    "device_id": {
+      "type": "string"
+    },
     "approved_count": {
       "type": "integer",
       "default": 0
     },
     "game_selected": {
+      "type": "string"
+    },
+    "prize_status": {
+      "type": "string",
+      "enum": [
+        "none",
+        "available",
+        "used",
+        "expired"
+      ],
+      "default": "none"
+    },
+    "prize_awarded_at": {
+      "type": "string"
+    },
+    "prize_expires_at": {
+      "type": "string"
+    },
+    "prize_used_at": {
       "type": "string"
     }
   },
