@@ -75,7 +75,14 @@ export default function Upload() {
         setStatus({ type: "error", message: data?.message || "لم يتم قبول الفاتورة." });
       }
     } catch (e) {
-      setStatus({ type: "error", message: "تعذر معالجة الفاتورة، حاول مرة أخرى." });
+      const errText = String(e?.message || e?.error || e || "");
+      const limitHit = errText.includes("limit") || errText.includes("upgrade");
+      setStatus({
+        type: "error",
+        message: limitHit
+          ? "فاتورتك لم تُرفض — لكن انتهت حصة الفحص الشهرية مؤقتاً.\nسيتم استعادة الخدمة تلقائياً عند تجديد الحصة."
+          : "تعذر معالجة الفاتورة، حاول مرة أخرى."
+      });
     } finally {
       setBusy(false);
       if (fileRef.current) fileRef.current.value = "";
