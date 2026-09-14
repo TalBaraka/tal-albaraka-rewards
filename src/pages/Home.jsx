@@ -28,14 +28,23 @@ export default function Home() {
     setLoading(true);
 
     try {
-      const {
-        data: { user },
-        error: userError,
-      } = await supabase.auth.getUser();
+      let {
+        data: { session },
+        error: sessionError,
+      } = await supabase.auth.getSession();
 
-      if (userError || !user) {
-        throw new Error("لم يتم تسجيل الدخول");
+      if (sessionError) throw sessionError;
+
+      if (!session?.user) {
+        const { data, error: authError } =
+          await supabase.auth.signInAnonymously();
+
+        if (authError) throw authError;
+
+        session = { user: data.user };
       }
+
+      const user = session.user;
 
       const { data, error: customerError } = await supabase
         .from("customers")
@@ -51,9 +60,7 @@ export default function Home() {
         .select()
         .single();
 
-      if (customerError) {
-        throw customerError;
-      }
+      if (customerError) throw customerError;
 
       localStorage.setItem("tal_customer_id", data.id);
       localStorage.setItem("tal_customer_name", data.name);
@@ -61,15 +68,12 @@ export default function Home() {
         "tal_count",
         String(data.approved_count || 0)
       );
-      localStorage.setItem(
-        "tal_state",
-        JSON.stringify(data)
-      );
+      localStorage.setItem("tal_state", JSON.stringify(data));
 
       navigate("/upload");
     } catch (e) {
       console.error("Start error:", e);
-      setError("تعذر بدء الجلسة، حاول مرة أخرى");
+      setError(e?.message || "تعذر بدء الجلسة، حاول مرة أخرى");
     } finally {
       setLoading(false);
     }
@@ -138,49 +142,6 @@ export default function Home() {
       >
         <Gift className="h-4 w-4 text-amber-300" />
         عرض مكافآتي
-      </Link>
-    </div>
-  );
-        }      <h1 className="mt-7 font-display text-3xl font-extrabold tracking-tight sm:text-4xl">
-        اربح لعبة مجانية
-      </h1>
-      <p className="mt-3 max-w-md text-balance text-white/70">
-        ارفع 4 فواتير معتمدة من تال البركة واحصل على لعبة مجانية واحدة من اختيارك.
-      </p>
-
-      <div className="mt-8 w-full max-w-sm space-y-3 rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-        <label htmlFor="name" className="flex items-center gap-2 text-sm font-medium text-white/80">
-          <Sparkles className="h-4 w-4 text-amber-300" />
-          اكتب اسمك
-        </label>
-        <Input
-          id="name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && start()}
-          placeholder="اكتب اسمك"
-          className="h-12 bg-white/10 text-center text-lg text-white placeholder:text-white/40 border-white/15"
-        />
-        {error && <p className="text-sm text-rose-300">{error}</p>}
-        <Button
-          onClick={start}
-          disabled={loading}
-          className="h-12 w-full bg-gradient-to-l from-amber-400 to-rose-500 text-base font-bold text-black hover:from-amber-300 hover:to-rose-400"
-        >
-          {loading ? "جارٍ التجهيز..." : "ابدأ الآن"}
-        </Button>
-      </div>
-
-      <div className="mt-8 flex items-center gap-2 text-xs text-white/50">
-        <Ticket className="h-4 w-4 text-amber-300" />
-        4 فواتير معتمدة = فتح جميع الألعاب
-      </div>
-
-      <Link
-        to="/my-rewards"
-        className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-white/15 px-4 py-2 text-sm text-white/70 hover:bg-white/10"
-      >
-        <Gift className="h-4 w-4 text-amber-300" /> عرض مكافآتي
       </Link>
     </div>
   );
