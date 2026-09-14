@@ -57,7 +57,7 @@ function App() {
   return (
     <AuthProvider>
       <QueryClientProvider client={queryClientInstance}>
-        <Router>
+        <Router basename="/tal-albaraka-rewards">
           <ScrollToTop />
           <AuthenticatedApp />
         </Router>
