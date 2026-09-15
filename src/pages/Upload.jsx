@@ -362,4 +362,73 @@ export default function Upload() {
                 {message}
               </p>
 
-              <div className="mt-
+              <div className="mt-5 h-3 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-amber-400 transition-all duration-300"
+                  style={{
+                    width: `${Math.max(progress, 5)}%`,
+                  }}
+                />
+              </div>
+
+              <p className="mt-2 text-xs text-white/50">
+                {progress}%
+              </p>
+            </div>
+          )}
+
+          {success && !loading && (
+            <div className="mt-8 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-5">
+              <div className="text-4xl">✅</div>
+
+              <p className="mt-3 font-bold text-emerald-200">
+                {message}
+              </p>
+
+              {JSON.parse(
+                localStorage.getItem("tal_state") || "{}"
+              ).approved_count < 4 && (
+                <button
+                  onClick={() => {
+                    setSuccess(false);
+                    setMessage("");
+                  }}
+                  className="mt-5 w-full rounded-xl bg-amber-400 px-5 py-3 font-bold text-black"
+                >
+                  رفع الفاتورة التالية
+                </button>
+              )}
+            </div>
+          )}
+
+          {error && !loading && (
+            <div className="mt-6 rounded-2xl border border-red-400/30 bg-red-400/10 p-5">
+              <div className="text-3xl">❌</div>
+
+              <p className="mt-3 font-bold text-red-200">
+                {error}
+              </p>
+
+              <button
+                onClick={() => {
+                  setError("");
+                  setMessage("");
+                }}
+                className="mt-5 w-full rounded-xl bg-white/10 px-5 py-3 font-bold text-white hover:bg-white/20"
+              >
+                المحاولة مرة أخرى
+              </button>
+            </div>
+          )}
+
+          <div className="mt-8 rounded-2xl bg-white/5 p-4 text-right text-xs leading-6 text-white/50">
+            <p>• يجب أن تكون الفاتورة واضحة بالكامل.</p>
+            <p>• يتم استخراج رقم الفاتورة تلقائيًا.</p>
+            <p>• لا يمكن استخدام نفس الفاتورة مرتين.</p>
+            <p>• تحتاج إلى 4 فواتير مقبولة للحصول على اللعبة المجانية.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+                                              }
