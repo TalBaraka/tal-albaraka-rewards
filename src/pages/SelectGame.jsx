@@ -1,21 +1,12 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-
-const GAMES = [
-  { key: "memory", name: "لعبة الذاكرة" },
-  { key: "quiz", name: "مسابقة الأسئلة" },
-  { key: "puzzle", name: "لعبة الألغاز" },
-  { key: "racing", name: "سباق السيارات" },
-  { key: "math", name: "التحدي الحسابي" },
-  { key: "words", name: "لعبة الكلمات" },
-];
+import { GAMES } from "../lib/games";
 
 const ACTIVE_CUSTOMER_KEY = "tal_active_customer_id";
 
 export default function SelectGame() {
   const navigate = useNavigate();
-
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState("");
 
@@ -34,110 +25,101 @@ export default function SelectGame() {
         );
       }
 
-      const { data: customer, error: customerError } =
-        await supabase
-          .from("customers")
-          .select(
-            "id, name, approved_count, prize_status, prize_expires_at, game_selected"
-          )
-          .eq("id", customerId)
-          .single();
+      const { data: customer, error: customerError } = await supabase
+        .from("customers")
+        .select(
+          "id, name, approved_count, prize_status, prize_expires_at, game_selected"
+        )
+        .eq("id", customerId)
+        .single();
 
-      if (customerError) {
-        throw customerError;
-      }
-
-      if (!customer) {
-        throw new Error("لم يتم العثور على بيانات العميل.");
-      }
+      if (customerError) throw customerError;
+      if (!customer) throw new Error("لم يتم العثور على بيانات العميل.");
 
       if (Number(customer.approved_count) < 4) {
-        throw new Error(
-          "لا يمكن اختيار اللعبة قبل اعتماد 4 فواتير."
-        );
+        throw new Error("لا يمكن اختيار الجائزة قبل اعتماد 4 فواتير.");
       }
 
       if (customer.prize_status !== "available") {
-        throw new Error(
-          "المكافأة غير متاحة حاليًا."
-        );
+        throw new Error("المكافأة غير متاحة حاليًا.");
       }
 
-      if (
-        customer.prize_expires_at &&
-        new Date(customer.prize_expires_at) <= new Date()
-      ) {
-        throw new Error(
-          "انتهت مدة صلاحية المكافأة."
-        );
-      }
+      const { error: updateError } = await supabase
+        .from("customers")
+        .update({
+          game_selected: gameKey,
+          prize_expires_at: null,
+        })
+        .eq("id", customer.id);
 
-      const { error: updateError } =
-        await supabase
-          .from("customers")
-          .update({
-            game_selected: gameKey,
-          })
-          .eq("id", customer.id);
-
-      if (updateError) {
-        throw updateError;
-      }
+      if (updateError) throw updateError;
 
       const newState = {
         ...customer,
         game_selected: gameKey,
+        prize_expires_at: null,
       };
 
-      localStorage.setItem(
-        "tal_state",
-        JSON.stringify(newState)
-      );
+      localStorage.setItem("tal_state", JSON.stringify(newState));
 
       navigate("/prize");
     } catch (e) {
       console.error(e);
-      setError(
-        e?.message ||
-          "تعذر اختيار اللعبة"
-      );
+      setError(e?.message || "تعذر اختيار الجائزة");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div
-      dir="rtl"
-      className="min-h-screen bg-background p-4"
-    >
-      <div className="mx-auto max-w-2xl py-8">
+    <div dir="rtl" className="min-h-full px-4 py-6">
+      <div className="mx-auto max-w-5xl">
 
-        <h1 className="mb-6 text-center text-3xl font-bold">
-          اختر لعبتك
-        </h1>
+        <div className="mb-8 text-center">
+          <div className="mb-4 inline-flex rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-2 font-bold text-amber-300">
+            🎉 مبروك! أكملت 4 فواتير معتمدة
+          </div>
 
-        <p className="mb-6 text-center text-muted-foreground">
-          مبروك! أكملت 4 فواتير معتمدة. اختر لعبتك المجانية.
-        </p>
+          <h1 className="text-3xl font-black text-white md:text-4xl">
+            اختر جائزتك المجانية
+          </h1>
+
+          <p className="mt-2 text-slate-300">
+            اختر واحدة من الجوائز الستة، وبعدها أكد استلامها لبدء مدة الساعة.
+          </p>
+        </div>
 
         {error && (
-          <div className="mb-5 rounded-lg bg-red-50 p-4 text-center text-red-700">
+          <div className="mb-5 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-center text-red-200">
             {error}
           </div>
         )}
 
-        <div className="grid gap-4">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {GAMES.map((game) => (
             <button
               key={game.key}
-              onClick={() =>
-                selectGame(game.key)
-              }
+              onClick={() => selectGame(game.key)}
               disabled={loading}
-              className="w-full rounded-xl border bg-card p-5 text-lg font-semibold shadow-sm transition hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50"
+              className="group overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/80 text-right shadow-lg transition hover:-translate-y-1 hover:border-amber-400/60 disabled:opacity-50"
             >
-              {game.name}
+              <div className="aspect-[4/3] overflow-hidden bg-slate-800">
+                <img
+                  src={game.image}
+                  alt={game.name}
+                  className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                />
+              </div>
+
+              <div className="p-4">
+                <div className="text-xl font-extrabold text-white">
+                  {game.name}
+                </div>
+
+                <div className="mt-1 text-sm text-amber-300">
+                  اضغط لاختيار الجائزة
+                </div>
+              </div>
             </button>
           ))}
         </div>
@@ -145,4 +127,4 @@ export default function SelectGame() {
       </div>
     </div>
   );
-      }
+              }
