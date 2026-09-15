@@ -17,7 +17,12 @@ export default function PrizeBanner({ state, onUpdate }) {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (state?.prize_status !== "available" || !state?.prize_expires_at") return;
+    if (
+      state?.prize_status !== "available" ||
+      !state?.prize_expires_at
+    ) {
+      return;
+    }
 
     const expires = new Date(state.prize_expires_at).getTime();
 
@@ -29,18 +34,23 @@ export default function PrizeBanner({ state, onUpdate }) {
 
     tick();
 
-    const t = setInterval(tick, 1000);
-    return () => clearInterval(t);
+    const timer = setInterval(tick, 1000);
+
+    return () => clearInterval(timer);
   }, [state?.prize_status, state?.prize_expires_at]);
 
-  if (!state || state.prize_status === "none") return null;
+  if (!state || state.prize_status === "none") {
+    return null;
+  }
 
   const game = state.game_selected
     ? GAME_BY_KEY(state.game_selected)
     : null;
 
   const confirmUse = async () => {
-    if (busy || remaining === 0) return;
+    if (busy || remaining === 0) {
+      return;
+    }
 
     setBusy(true);
 
@@ -55,9 +65,14 @@ export default function PrizeBanner({ state, onUpdate }) {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
-      localStorage.setItem("tal_state", JSON.stringify(data));
+      localStorage.setItem(
+        "tal_state",
+        JSON.stringify(data)
+      );
 
       if (onUpdate) {
         onUpdate(data);
@@ -156,4 +171,4 @@ export default function PrizeBanner({ state, onUpdate }) {
       )}
     </div>
   );
-}
+        }
