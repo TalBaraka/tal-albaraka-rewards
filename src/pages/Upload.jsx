@@ -2,15 +2,29 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload as UploadIcon, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Upload as UploadIcon,
+  CheckCircle2,
+  XCircle,
+  Loader2,
+} from "lucide-react";
 import Tesseract from "tesseract.js";
 
-const TAL_ALBARAKA_TAX_NUMBER = "300262985100003";
-const REJECTION_MESSAGE =
+const DEVICE_KEY = "tal_baraka_device_key";
+const ACTIVE_CUSTOMER_KEY = "tal_active_customer_id";
+const STATE_KEY = "tal_state";
+
+const TAX_NUMBER = "300262985100003";
+const REJECTION =
   "لم يتم قبولها. يرجى رفع صورة للفواتير المعتمدة.";
 
-const MERCHANT_NAMES = [
+const MERCHANTS = [
   "مؤسسة تل البركة",
   "تل البركة",
   "تال البركة",
@@ -20,14 +34,18 @@ const MERCHANT_NAMES = [
   "talalbaraka",
 ];
 
-function normalizeArabicDigits(value = "") {
+function normalizeDigits(value = "") {
   return String(value)
-    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)))
-    .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)));
+    .replace(/[٠-٩]/g, (d) =>
+      String("٠١٢٣٤٥٦٧٨٩".indexOf(d))
+    )
+    .replace(/[۰-۹]/g, (d) =>
+      String("۰۱۲۳۴۵۶۷۸۹".indexOf(d))
+    );
 }
 
-function normalizeText(value = "") {
-  return normalizeArabicDigits(value)
+function normalize(value = "") {
+  return normalizeDigits(value)
     .toLowerCase()
     .replace(/[إأآ]/g, "ا")
     .replace(/ة/g, "ه")
@@ -37,65 +55,37 @@ function normalizeText(value = "") {
     .trim();
 }
 
-function normalizeCompact(value = "") {
-  return normalizeText(value).replace(/\s/g, "");
+function compact(value = "") {
+  return normalize(value).replace(/\s/g, "");
 }
 
 function digitsOnly(value = "") {
-  return normalizeArabicDigits(value).replace(/\D/g, "");
+  return normalizeDigits(value).replace(/\D/g, "");
 }
 
-function hasAny(text, values) {
-  const normalized = normalizeText(text);
-  return values.some((value) =>
-    normalized.includes(normalizeText(value))
+function merchantFound(text) {
+  const value = compact(text);
+
+  return MERCHANTS.some((name) =>
+    value.includes(compact(name))
   );
 }
 
-function containsMerchant(text) {
-  const normalized = normalizeCompact(text);
-
-  return MERCHANT_NAMES.some((name) =>
-    normalized.includes(normalizeCompact(name))
-  );
-}
-
-function containsTaxInvoice(text) {
-  const normalized = normalizeText(text);
+function taxInvoiceFound(text) {
+  const value = normalize(text);
 
   return (
-    normalized.includes("فاتوره ضريبيه مبسطه") ||
-    normalized.includes("فاتوره ضريبيه") ||
-    normalized.includes("ضريبيه مبسطه") ||
-    normalized.includes("simplified tax invoice")
+    value.includes("فاتوره ضريبيه مبسطه") ||
+    value.includes("فاتوره ضريبيه") ||
+    value.includes("ضريبيه مبسطه") ||
+    value.includes("simplified tax invoice")
   );
 }
 
-function containsVat(text) {
-  const normalized = normalizeText(text);
+function structureScore(text) {
+  const value = normalize(text);
 
-  return (
-    normalized.includes("vat") ||
-    normalized.includes("ضريبه") ||
-    normalized.includes("ضريبة") ||
-    normalized.includes("15%") ||
-    normalized.includes("15")
-  );
-}
-
-function containsJeddah(text) {
-  const normalized = normalizeText(text);
-
-  return (
-    normalized.includes("جده") ||
-    normalized.includes("jeddah")
-  );
-}
-
-function containsInvoiceStructure(text) {
-  const normalized = normalizeText(text);
-
-  const terms = [
+  const words = [
     "الاجمالي",
     "المجموع",
     "total",
@@ -112,24 +102,22 @@ function containsInvoiceStructure(text) {
     "invoice",
   ];
 
-  return terms.filter((term) =>
-    normalized.includes(normalizeText(term))
+  return words.filter((word) =>
+    value.includes(normalize(word))
   ).length;
 }
 
 function extractInvoiceNumber(text) {
-  const normalized = normalizeArabicDigits(text);
+  const value = normalizeDigits(text);
 
   const patterns = [
     /(?:invoice\s*(?:no|number)?|فاتورة\s*(?:رقم|رقم الفاتورة)?|رقم\s*الفاتورة)\s*[:#\-]?\s*([A-Za-z0-9٠-٩]+(?:[-/][A-Za-z0-9٠-٩]+)+)/i,
-
     /\b(\d{1,4}[-/]\d{1,4}[-/]\d{1,4}[-/]\d{3,12})\b/,
-
     /\b(\d{1,4}[-/]\d{1,4}[-/]\d{3,12})\b/,
   ];
 
   for (const pattern of patterns) {
-    const match = normalized.match(pattern);
+    const match = value.match(pattern);
 
     if (match?.[1]) {
       return match[1].trim();
@@ -139,93 +127,83 @@ function extractInvoiceNumber(text) {
   return "";
 }
 
-function validateTalAlbarakaInvoice(text) {
-  const normalized = normalizeText(text);
-  const compact = normalizeCompact(text);
+function validateInvoice(text) {
+  const value = normalize(text);
+  const compactValue = compact(text);
 
-  const merchantOk = containsMerchant(text);
-  const taxInvoiceOk = containsTaxInvoice(text);
-  const vatOk = containsVat(text);
-  const locationOk = containsJeddah(text);
+  const merchantOk = merchantFound(text);
+  const taxInvoiceOk = taxInvoiceFound(text);
 
   const taxNumberOk =
-    digitsOnly(text).includes(TAL_ALBARAKA_TAX_NUMBER);
+    digitsOnly(text).includes(TAX_NUMBER);
 
-  const structureScore = containsInvoiceStructure(text);
+  const jeddahOk =
+    value.includes("جده") ||
+    value.includes("jeddah");
+
+  const vatOk =
+    value.includes("vat") ||
+    value.includes("ضريبه") ||
+    value.includes("ضريبة") ||
+    value.includes("15%") ||
+    value.includes("15");
 
   const dateOk =
-    /\b\d{1,2}\s*[\/\-]\s*\d{1,2}\s*[\/\-]\s*\d{2,4}\b/.test(
-      normalizeArabicDigits(text)
-    ) ||
-    /\b\d{1,2}\s*[\/\-]\s*\d{1,2}\b/.test(
-      normalizeArabicDigits(text)
+    /\b\d{1,2}\s*[\/-]\s*\d{1,2}\s*[\/-]\s*\d{2,4}\b/.test(
+      normalizeDigits(text)
     );
 
   const totalOk =
-    normalized.includes("الاجمالي") ||
-    normalized.includes("المجموع") ||
-    normalized.includes("total");
+    value.includes("الاجمالي") ||
+    value.includes("المجموع") ||
+    value.includes("total");
 
   const itemOk =
-    normalized.includes("الصنف") ||
-    normalized.includes("item");
+    value.includes("الصنف") ||
+    value.includes("item");
 
   const quantityOk =
-    normalized.includes("الكميه") ||
-    normalized.includes("quantity");
+    value.includes("الكميه") ||
+    value.includes("quantity");
 
   const priceOk =
-    normalized.includes("السعر") ||
-    normalized.includes("price") ||
-    /\d+\.\d{2}/.test(normalized);
+    value.includes("السعر") ||
+    value.includes("price") ||
+    /\d+\.\d{2}/.test(value);
 
-  const merchantIdentityOk =
+  const merchantIdentity =
     merchantOk ||
-    compact.includes("تلبركه") ||
-    compact.includes("تالبركه");
+    compactValue.includes("تلبركه") ||
+    compactValue.includes("تالبركه");
 
-  /*
-   * لا نعتمد على QR.
-   *
-   * نريد التأكد من أن الصورة تشبه فاتورة تل البركة
-   * وتحتوي على مجموعة كافية من عناصر الفاتورة.
-   */
+  const score = structureScore(text);
 
-  const structuralEvidence =
-    structureScore >= 3 &&
+  const structuralOk =
+    score >= 3 &&
     (dateOk || totalOk) &&
     (itemOk || quantityOk || priceOk);
 
-  const identityEvidence =
-    merchantIdentityOk &&
-    (taxInvoiceOk || vatOk || taxNumberOk || locationOk);
-
-  const strongIdentity =
-    merchantIdentityOk &&
-    (taxNumberOk || taxInvoiceOk);
+  const identityOk =
+    merchantIdentity &&
+    (taxInvoiceOk ||
+      taxNumberOk ||
+      vatOk ||
+      jeddahOk);
 
   const accepted =
-    strongIdentity ||
-    (identityEvidence && structuralEvidence) ||
-    (merchantIdentityOk &&
-      taxInvoiceOk &&
-      vatOk &&
-      structureScore >= 3);
+    merchantIdentity &&
+    (taxNumberOk || taxInvoiceOk) &&
+    (structuralOk || score >= 4);
 
   return {
     accepted,
+    invoiceNumber: extractInvoiceNumber(text),
     merchantOk,
     taxInvoiceOk,
-    vatOk,
     taxNumberOk,
-    locationOk,
-    structureScore,
-    dateOk,
-    totalOk,
-    itemOk,
-    quantityOk,
-    priceOk,
-    invoiceNumber: extractInvoiceNumber(text),
+    vatOk,
+    jeddahOk,
+    score,
   };
 }
 
@@ -252,7 +230,6 @@ function prepareImage(file) {
         canvas.height = height;
 
         const ctx = canvas.getContext("2d");
-
         ctx.drawImage(image, 0, 0, width, height);
 
         URL.revokeObjectURL(url);
@@ -260,7 +237,9 @@ function prepareImage(file) {
         canvas.toBlob(
           (blob) => {
             if (!blob) {
-              reject(new Error("تعذر تجهيز الصورة"));
+              reject(
+                new Error("تعذر تجهيز الصورة")
+              );
               return;
             }
 
@@ -277,25 +256,13 @@ function prepareImage(file) {
 
     image.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error("تعذر قراءة الصورة"));
+      reject(
+        new Error("تعذر قراءة الصورة")
+      );
     };
 
     image.src = url;
   });
-}
-
-async function getCustomerState(userId) {
-  const { data, error } = await supabase
-    .from("customers")
-    .select(
-      "id, name, approved_count, prize_status, prize_expires_at, game_selected"
-    )
-    .eq("user_id", userId)
-    .single();
-
-  if (error) throw error;
-
-  return data;
 }
 
 export default function Upload() {
@@ -337,7 +304,9 @@ export default function Upload() {
     }
 
     if (selected.size > 10 * 1024 * 1024) {
-      setError("حجم الصورة كبير جدًا. الحد الأقصى 10 ميجابايت.");
+      setError(
+        "حجم الصورة كبير جدًا. الحد الأقصى 10 ميجابايت."
+      );
       return;
     }
 
@@ -347,7 +316,27 @@ export default function Upload() {
 
   async function submitInvoice() {
     if (!file) {
-      setError("يرجى اختيار صورة الفاتورة أولًا.");
+      setError(
+        "يرجى اختيار صورة الفاتورة أولًا."
+      );
+      return;
+    }
+
+    const deviceKey =
+      localStorage.getItem(DEVICE_KEY);
+
+    const customerId =
+      localStorage.getItem(
+        ACTIVE_CUSTOMER_KEY
+      ) ||
+      localStorage.getItem(
+        "tal_customer_id"
+      );
+
+    if (!deviceKey || !customerId) {
+      setError(
+        "لم يتم العثور على بيانات العميل على هذا الجهاز. ارجع للصفحة الرئيسية واكتب اسم العميل."
+      );
       return;
     }
 
@@ -358,39 +347,54 @@ export default function Upload() {
     setProgress(5);
 
     try {
-      setMessage("جاري تجهيز صورة الفاتورة...");
-      const imageBlob = await prepareImage(file);
-
-      setProgress(15);
-      setMessage("جاري التأكد أن الفاتورة من تل البركة...");
-
-      const result = await Tesseract.recognize(
-        imageBlob,
-        "ara+eng",
-        {
-          logger: (info) => {
-            if (info.status === "recognizing text") {
-              const value = Math.round(
-                15 + (info.progress || 0) * 45
-              );
-
-              setProgress(value);
-            }
-          },
-          config: {
-            tessedit_pageseg_mode: "6",
-          },
-        }
+      setMessage(
+        "جاري تجهيز صورة الفاتورة..."
       );
 
-      const text = result?.data?.text || "";
+      const imageBlob =
+        await prepareImage(file);
+
+      setProgress(15);
+
+      setMessage(
+        "جاري التأكد أن الفاتورة من تل البركة..."
+      );
+
+      const result =
+        await Tesseract.recognize(
+          imageBlob,
+          "ara+eng",
+          {
+            logger: (info) => {
+              if (
+                info.status ===
+                "recognizing text"
+              ) {
+                setProgress(
+                  Math.round(
+                    15 +
+                      (info.progress || 0) *
+                        45
+                  )
+                );
+              }
+            },
+            config: {
+              tessedit_pageseg_mode: "6",
+            },
+          }
+        );
+
+      const text =
+        result?.data?.text || "";
 
       setProgress(65);
 
-      const validation = validateTalAlbarakaInvoice(text);
+      const validation =
+        validateInvoice(text);
 
       if (!validation.accepted) {
-        setError(REJECTION_MESSAGE);
+        setError(REJECTION);
         setMessage("");
         setLoading(false);
         return;
@@ -402,120 +406,190 @@ export default function Upload() {
 
       setProgress(72);
 
-      const invoiceNumber = validation.invoiceNumber;
+      const invoiceNumber =
+        validation.invoiceNumber;
 
       if (!invoiceNumber) {
-        setError(REJECTION_MESSAGE);
+        setError(REJECTION);
         setMessage("");
         setLoading(false);
         return;
       }
 
-      const {
+      let {
         data: { session },
       } = await supabase.auth.getSession();
 
       if (!session?.user) {
-        throw new Error("لم يتم العثور على جلسة المستخدم");
+        const { data, error: authError } =
+          await supabase.auth.signInAnonymously();
+
+        if (authError) {
+          throw authError;
+        }
+
+        session = {
+          user: data.user,
+        };
       }
 
       setProgress(78);
-      setMessage("جاري حفظ الفاتورة وفحص التكرار...");
 
-      const customer = await getCustomerState(session.user.id);
+      setMessage(
+        "جاري حفظ الفاتورة وفحص التكرار..."
+      );
 
       const extension =
-        file.name.split(".").pop()?.toLowerCase() || "jpg";
+        file.name
+          .split(".")
+          .pop()
+          ?.toLowerCase() || "jpg";
 
       const filePath =
         `${session.user.id}/${crypto.randomUUID()}.${extension}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("invoices")
-        .upload(filePath, imageBlob, {
-          contentType: "image/jpeg",
-          upsert: false,
-        });
+      const { error: uploadError } =
+        await supabase.storage
+          .from("invoices")
+          .upload(
+            filePath,
+            imageBlob,
+            {
+              contentType:
+                "image/jpeg",
+              upsert: false,
+            }
+          );
 
       if (uploadError) {
         throw uploadError;
       }
 
-      setProgress(86);
+      setProgress(88);
 
-      const { data: approval, error: rpcError } =
-        await supabase.rpc(
-          "approve_invoice_and_update_customer",
-          {
-            p_customer_id: customer.id,
-            p_invoice_number: invoiceNumber,
-            p_file_path: filePath,
-            p_invoice_date: null,
-            p_total_amount: null,
-          }
-        );
+      /*
+       * هذه الدالة تفحص رقم الفاتورة
+       * على مستوى قاعدة البيانات كلها.
+       *
+       * لذلك لو تم استخدام نفس الفاتورة
+       * من جهاز آخر سيتم رفضها أيضًا.
+       */
+      const {
+        data: approval,
+        error: rpcError,
+      } = await supabase.rpc(
+        "approve_invoice_for_device",
+        {
+          p_customer_id:
+            customerId,
+
+          p_invoice_number:
+            invoiceNumber,
+
+          p_file_path:
+            filePath,
+
+          p_invoice_date:
+            null,
+
+          p_total_amount:
+            null,
+
+          p_device_key:
+            deviceKey,
+        }
+      );
 
       if (rpcError) {
-        /*
-         * إذا كانت الفاتورة مكررة، لا نزيد العدد.
-         */
         throw rpcError;
       }
 
+      const oldState =
+        JSON.parse(
+          localStorage.getItem(
+            STATE_KEY
+          ) || "{}"
+        );
+
       const approvedCount =
         approval?.approved_count ??
-        customer.approved_count + 1;
+        Number(
+          oldState.approved_count || 0
+        ) + 1;
+
+      const newState = {
+        ...oldState,
+
+        id: customerId,
+
+        approved_count:
+          approvedCount,
+
+        prize_status:
+          approval?.prize_status ||
+          "none",
+
+        prize_expires_at:
+          approval?.prize_expires_at ||
+          null,
+      };
+
+      localStorage.setItem(
+        STATE_KEY,
+        JSON.stringify(newState)
+      );
+
+      localStorage.setItem(
+        "tal_count",
+        String(approvedCount)
+      );
 
       setProgress(100);
-
       setSuccess(true);
 
       setMessage(
         `تم قبول الفاتورة بنجاح. الفواتير المقبولة: ${approvedCount}/4`
       );
 
-      const newState = {
-        ...customer,
-        approved_count: approvedCount,
-        prize_status: approval?.prize_status || "none",
-        prize_expires_at:
-          approval?.prize_expires_at || null,
-      };
-
-      localStorage.setItem(
-        "tal_state",
-        JSON.stringify(newState)
-      );
-
       setTimeout(() => {
         if (approvedCount >= 4) {
           navigate("/select-game");
-        } else {
-          setFile(null);
-          setPreview("");
-          setProgress(0);
-          setSuccess(false);
-          setMessage(
-            `تم قبول الفاتورة. لديك الآن ${approvedCount}/4 فواتير معتمدة.`
-          );
+          return;
         }
+
+        setFile(null);
+        setPreview("");
+        setProgress(0);
+        setSuccess(false);
+
+        setMessage(
+          `تم قبول الفاتورة. لديك الآن ${approvedCount}/4 فواتير معتمدة.`
+        );
       }, 1200);
     } catch (e) {
       console.error(e);
 
-      const errorMessage = String(e?.message || "");
+      const errorMessage =
+        String(e?.message || "");
 
       if (
-        errorMessage.includes("تم استخدام هذه الفاتورة") ||
-        errorMessage.includes("duplicate") ||
-        errorMessage.includes("unique")
+        errorMessage.includes(
+          "تم استخدام هذه الفاتورة"
+        ) ||
+        errorMessage.includes(
+          "duplicate"
+        ) ||
+        errorMessage.includes(
+          "unique"
+        )
       ) {
         setError(
           "تم استخدام هذه الفاتورة من قبل ولا يمكن استخدامها مرة أخرى."
         );
       } else {
         setError(
-          e?.message || "تعذر معالجة الفاتورة، حاول مرة أخرى."
+          e?.message ||
+            "تعذر معالجة الفاتورة، حاول مرة أخرى."
         );
       }
 
@@ -528,6 +602,7 @@ export default function Upload() {
   return (
     <div className="min-h-screen bg-background p-4">
       <div className="mx-auto max-w-2xl space-y-6 py-6">
+
         <Card>
           <CardHeader>
             <CardTitle className="text-center text-2xl">
@@ -536,9 +611,12 @@ export default function Upload() {
           </CardHeader>
 
           <CardContent className="space-y-5">
+
             <div className="rounded-xl border-2 border-dashed p-6 text-center">
+
               {preview ? (
                 <div className="space-y-4">
+
                   <img
                     src={preview}
                     alt="معاينة الفاتورة"
@@ -547,7 +625,9 @@ export default function Upload() {
 
                   <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border px-4 py-2">
                     <UploadIcon className="h-5 w-5" />
+
                     تغيير الصورة
+
                     <input
                       type="file"
                       accept="image/*"
@@ -556,9 +636,12 @@ export default function Upload() {
                       disabled={loading}
                     />
                   </label>
+
                 </div>
               ) : (
+
                 <label className="block cursor-pointer">
+
                   <UploadIcon className="mx-auto mb-3 h-12 w-12" />
 
                   <div className="text-lg font-medium">
@@ -576,43 +659,62 @@ export default function Upload() {
                     onChange={handleFileChange}
                     disabled={loading}
                   />
+
                 </label>
               )}
+
             </div>
 
             {loading && (
               <div className="space-y-2">
+
                 <div className="flex items-center gap-2 text-sm">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {message || "جاري معالجة الفاتورة..."}
+                  {message ||
+                    "جاري معالجة الفاتورة..."}
                 </div>
 
                 <div className="h-2 overflow-hidden rounded-full bg-muted">
+
                   <div
                     className="h-full rounded-full bg-primary transition-all"
-                    style={{ width: `${progress}%` }}
+                    style={{
+                      width: `${progress}%`,
+                    }}
                   />
+
                 </div>
 
                 <div className="text-center text-xs text-muted-foreground">
                   {progress}%
                 </div>
+
               </div>
             )}
 
             {!loading && message && (
               <div className="flex items-center gap-2 rounded-lg bg-green-50 p-4 text-green-700">
+
                 {success && (
                   <CheckCircle2 className="h-5 w-5 shrink-0" />
                 )}
-                <span>{message}</span>
+
+                <span>
+                  {message}
+                </span>
+
               </div>
             )}
 
             {error && (
               <div className="flex items-start gap-2 rounded-lg bg-red-50 p-4 text-red-700">
+
                 <XCircle className="mt-0.5 h-5 w-5 shrink-0" />
-                <span>{error}</span>
+
+                <span>
+                  {error}
+                </span>
+
               </div>
             )}
 
@@ -639,8 +741,10 @@ export default function Upload() {
               </strong>
               ثم فحص رقم الفاتورة لمنع التكرار.
             </div>
+
           </CardContent>
         </Card>
+
       </div>
     </div>
   );
